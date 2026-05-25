@@ -3,6 +3,20 @@
 > Read this first if resuming the stabilization work. It captures plan state that
 > is NOT recoverable from git alone.
 
+## OVERNIGHT MANDATE (read first)
+The user is asleep and wants this driven to a **full-fledged working app**, autonomously, in
+one continuous run. Don't stop for routine confirmations. "Working app" = acceptance criteria:
+- `alembic upgrade head` builds the schema on a fresh disposable local DB (already proven).
+- `python -c "import app.main"` is clean and the FastAPI app boots (uvicorn import check).
+- Public lead-capture endpoints work end-to-end under `/api/v1` and persist lead + outbox row in one txn.
+- `/api/v1/console/**` is auth-protected (401 unauth, 403 wrong tenant) via TenantRequire.
+- ARQ worker imports and drains the outbox (validated against the local DB inline).
+- Frontend `npm run build` succeeds and the public site calls the `/api/v1` endpoints.
+- Integration tests authored; run what the env allows, document what's deferred.
+Work through Phases 2→6 in order. Commit locally at each phase (NO push/merge/prod). If truly
+blocked on an irreversible/destructive decision, leave a clear note in this file and continue
+with the next independent task. Keep this doc + the todo list updated as you go.
+
 ## Where we are
 - **Branch:** `platform/stabilization-saas-foundation` (off `main`). NOTHING pushed; do not `git push`.
 - **Last commit:** `7c37d8c` — "Phase 0+1: foundation, multi-tenant models, clean Alembic baseline".
