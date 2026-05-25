@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
 
-import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -23,16 +22,12 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
 from app.db.session import db_session
-from app.llm.service import LLMService
 from app.middleware.exception_handler import build_exception_handler
 from app.middleware.rate_limiter import limiter as shared_limiter
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.request_timing import RequestTimingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.messaging.dispatcher import MessageDispatcher
 from app.redis.client import build_redis_client
-from app.redis.state_store import RedisStateStore
-from app.services.email_service import EmailService
 from app.utils.logger import app_logger
 
 
@@ -51,43 +46,33 @@ async def lifespan(app: FastAPI):
     """
     settings = get_settings()
     redis_client = None
-    http_client = None
     initialized_resources: list[str] = []
-    
+
     try:
         # Initialize resources in order
         redis_client = build_redis_client(settings.redis_url)
         initialized_resources.append("redis")
-        
-        http_client = httpx.AsyncClient(timeout=20.0)
-        initialized_resources.append("http_client")
-        
+
         # Initialize database session
         db_session.initialize(settings)
         initialized_resources.append("database")
-        
+
         # Store in app state
         app.state.settings = settings
         app.state.redis_client = redis_client
-        app.state.http_client = http_client
-        app.state.state_store = RedisStateStore(redis_client, settings.effective_session_ttl_seconds)
-        app.state.llm_service = LLMService(settings)
-        app.state.dispatcher = MessageDispatcher(settings, http_client)
-        app.state.email_service = EmailService(settings)
-        
+
         # Log startup information
         logger.info(
             f"Application started: {settings.app_name} (env={settings.environment}, debug={settings.debug})"
         )
-        
+
         yield
-        
+
     except Exception as e:
         logger.error(f"Startup failed: {e}")
         # Clean up any initialized resources on failure
         await _cleanup_resources(
             redis_client=redis_client if "redis" in initialized_resources else None,
-            http_client=http_client if "http_client" in initialized_resources else None,
             cleanup_db="database" in initialized_resources,
         )
         raise
@@ -95,25 +80,17 @@ async def lifespan(app: FastAPI):
         # Clean up on normal shutdown
         await _cleanup_resources(
             redis_client=redis_client,
-            http_client=http_client,
             cleanup_db=True,
         )
 
 
 async def _cleanup_resources(
     redis_client: Any | None = None,
-    http_client: Any | None = None,
     cleanup_db: bool = False,
 ) -> None:
     """Clean up application resources in reverse order."""
     errors: list[str] = []
-    
-    if http_client is not None:
-        try:
-            await http_client.aclose()
-        except Exception as e:
-            errors.append(f"HTTP client: {e}")
-    
+
     if redis_client is not None:
         try:
             await redis_client.aclose()
@@ -141,7 +118,7 @@ else:
 
 app = FastAPI(
     title=settings.app_name,
-    description="Multi-channel LLM chatbot backend (Telegram + WhatsApp).",
+    description="Multi-tenant study-abroad agency platform: public lead capture + tenant-scoped management console.",
     version="0.1.0",
     openapi_url=f"{settings.api_prefix}/openapi.json",
     debug=settings.debug,
