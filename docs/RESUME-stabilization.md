@@ -34,5 +34,11 @@
 - Kept the rich typed lead tables (inquiries/callbacks/applications/cost_estimates/qr_logs); the blueprint's "Lead.status/processed_at/failure_reason" is satisfied by `OutboxEvent` (durable processing/audit), not per-lead status.
 - Added `slowapi` to deps (rate-limiting public lead routes) beyond the blueprint's list.
 
+## Resume mode (user-chosen)
+**Delegate to sub-agents.** On resume, re-dispatch AGENT-AUTH (Phase 2) and AGENT-ASYNC
+(Phase 3) IN PARALLEL (single message, two Agent calls — disjoint file scopes). Orchestrator
+integrates them in Phase 4.
+
 ## The two ready-to-dispatch sub-agent prompts
-The full AGENT-AUTH and AGENT-ASYNC prompts (with frozen interface contracts and write boundaries) are in the conversation that produced commit `7c37d8c`. If lost, regenerate from the "Sub-agent assignments" section of the plan + the interfaces in `app/db/models/tenant.py`, `app/db/models/outbox.py`, `app/core/enums.py`, `app/core/config.py`, `app/db/session.py`.
+Verbatim, with frozen interface contracts and strict write boundaries:
+**`docs/stabilization-agent-prompts.md`**. Copy each block into an Agent (general-purpose) call.
