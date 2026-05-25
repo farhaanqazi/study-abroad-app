@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ssl
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -91,7 +93,7 @@ def create_db_engine(settings: Settings):
         max_overflow=20,        # Allow 20 temporary connections during traffic spikes
         pool_pre_ping=True,     # Verify connection is alive before use (prevents stale connections)
         pool_recycle=1800,      # Recycle connections every 30 minutes (prevents Supabase timeouts)
-        echo=settings.debug,
+        echo=False,             # Never echo SQL — structured logging is the audit channel.
     )
 
     return engine
@@ -151,3 +153,29 @@ db_session = DatabaseSession()
 # Backwards compatibility - these will initialize on first use
 engine = db_session.engine
 SessionLocal = db_session.session_factory
+
+
+async def get_session() -> AsyncIterator[AsyncSession]:
+    """FastAPI request-scoped session dependency.
+
+    The session is closed when the request ends. Commit/rollback is the caller's
+    (service layer's) responsibility — routes only wire the dependency.
+    """
+    async with db_session.session_factory() as session:
+        yield session
+
+
+@asynccontextmanager
+async def session_scope() -> AsyncIterator[AsyncSession]:
+    """Async session context manager for non-request contexts (ARQ workers,
+    scripts). Commits on clean exit, rolls back on exception, always closes.
+    """
+    session = db_session.session_factory()
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()

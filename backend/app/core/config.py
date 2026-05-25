@@ -32,6 +32,27 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("REDIS_URL"),
     )
 
+    # Authentication (Clerk / provider-agnostic OIDC)
+    # secret is used for Clerk Backend API calls only — NEVER sent to the JWKS endpoint.
+    clerk_secret_key: Optional[str] = Field(default=None, validation_alias=AliasChoices("CLERK_SECRET_KEY"))
+    clerk_audience: Optional[str] = Field(default=None, validation_alias=AliasChoices("CLERK_AUDIENCE"))
+    clerk_issuer: Optional[str] = Field(default=None, validation_alias=AliasChoices("CLERK_ISSUER"))
+    # JWKS endpoint is public; defaults to "{issuer}/.well-known/jwks.json" when unset.
+    clerk_jwks_url: Optional[str] = Field(default=None, validation_alias=AliasChoices("CLERK_JWKS_URL"))
+    clerk_jwks_cache_ttl_seconds: int = Field(
+        default=3600,
+        ge=60,
+        validation_alias=AliasChoices("CLERK_JWKS_CACHE_TTL_SECONDS"),
+    )
+
+    @property
+    def effective_clerk_jwks_url(self) -> Optional[str]:
+        if self.clerk_jwks_url:
+            return self.clerk_jwks_url
+        if self.clerk_issuer:
+            return f"{self.clerk_issuer.rstrip('/')}/.well-known/jwks.json"
+        return None
+
     # LLM
     groq_api_key: Optional[str] = Field(default=None, validation_alias=AliasChoices("GROQ_API_KEY"))
     groq_model: str = Field(default="llama-3.3-70b-versatile", validation_alias=AliasChoices("GROQ_MODEL"))
@@ -130,10 +151,24 @@ class Settings(BaseSettings):
         if "YOUR_" in self.database_url.upper() or "PLACEHOLDER" in self.database_url.upper():
             offenders.append("DATABASE_URL")
 
+        # Auth must be fully configured in production — unauthenticated management
+        # routes are a hard failure (see TenantRequire).
+        missing_auth: list[str] = []
+        if not self.clerk_issuer:
+            missing_auth.append("CLERK_ISSUER")
+        if not self.clerk_audience:
+            missing_auth.append("CLERK_AUDIENCE")
+
+        problems: list[str] = []
         if offenders:
+            problems.append(f"placeholder values still set for: {', '.join(offenders)}")
+        if missing_auth:
+            problems.append(f"auth not configured (missing: {', '.join(missing_auth)})")
+
+        if problems:
             raise ValueError(
-                "ENVIRONMENT=production but placeholder values are still set for: "
-                f"{', '.join(offenders)}. Update .env with real values before starting."
+                "ENVIRONMENT=production but " + "; ".join(problems) + ". "
+                "Update .env with real values before starting."
             )
         return self
 

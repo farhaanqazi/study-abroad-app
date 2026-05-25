@@ -1,87 +1,81 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.core.config import get_settings  # noqa: E402
-from app.db.base import Base  # noqa: E402  (triggers model imports)
-
+from app.db.base import Base  # noqa: E402  (registers all models on Base.metadata)
+from app.db.session import normalize_database_url_for_asyncpg  # noqa: E402
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-
-def _migration_url() -> str:
-    """Return a sync DSN for psycopg2.
-
-    The application uses `postgresql+asyncpg`; Alembic runs synchronously, so
-    we swap the driver while keeping host, database, and credentials intact.
-    """
-    raw = get_settings().database_url.strip()
-    for prefix in ("postgresql+asyncpg://", "postgres://", "postgresql://"):
-        if raw.startswith(prefix):
-            return "postgresql+psycopg2://" + raw.split("://", 1)[1]
-    return raw
-
-
-config.set_main_option("sqlalchemy.url", _migration_url())
-
 target_metadata = Base.metadata
 
 
-# Tables that exist in the database but are intentionally not modelled in SQLAlchemy.
-# These are managed via raw SQL migrations (RLS-aware audit logs, operational
-# tables, or legacy artifacts) and autogenerate would otherwise try to drop them.
-IGNORED_TABLE_NAMES = {
-    "appointment_status_log",  # populated by trigger; lives in sql/schema.sql
-    "vendor_closures",          # operational table; lives in sql/schema.sql
-    "schema_migrations",       # legacy migration tracker, predates Alembic
-}
-
-
 def include_object(object_, name, type_, reflected, compare_to):
-    """Filter what autogenerate considers.
-
-    - Skip non-public schemas so we don't try to manage Supabase's `auth`,
-      `storage`, `realtime`, or `extensions` schemas.
-    - Skip tables listed in IGNORED_TABLE_NAMES so autogenerate doesn't
-      emit DROP TABLE ops for tables managed in raw SQL.
-    - Skip native PostgreSQL ENUM type objects: they're declared with
-      `create_type=False` in the models because they're owned by SQL
-      migrations, and autogenerate would otherwise emit redundant
-      CREATE/DROP TYPE ops on every run.
-    """
+    """Restrict autogenerate to the public schema. Guards against ever
+    touching an external provider's managed schemas (auth/storage/realtime)
+    if the configured database happens to be a managed Postgres."""
     if type_ == "schema" and name not in (None, "public"):
         return False
-    if type_ == "table":
-        if getattr(object_, "schema", None) not in (None, "public"):
-            return False
-        if name in IGNORED_TABLE_NAMES:
-            return False
-    if type_ in ("column", "index", "unique_constraint", "foreign_key_constraint"):
-        parent_table = getattr(object_, "table", None)
-        if parent_table is not None and parent_table.name in IGNORED_TABLE_NAMES:
-            return False
-    if isinstance(object_, PG_ENUM):
+    if type_ == "table" and getattr(object_, "schema", None) not in (None, "public"):
         return False
     return True
 
 
-def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+def _do_run_migrations(connection) -> None:
     context.configure(
-        url=url,
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+        include_schemas=False,
+        compare_type=True,
+        compare_server_default=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_migrations_online() -> None:
+    """Run migrations through an async (asyncpg) engine — the app uses no sync
+    DB driver, so neither does Alembic."""
+    settings = get_settings()
+    clean_url, ssl_mode = normalize_database_url_for_asyncpg(settings.database_url)
+
+    connect_args: dict = {}
+    if ssl_mode in ("require", "verify-full", "verify-ca"):
+        import ssl as _ssl
+
+        import certifi
+
+        ctx = _ssl.create_default_context(cafile=certifi.where())
+        ctx.check_hostname = False
+        ctx.verify_mode = _ssl.CERT_NONE
+        connect_args["ssl"] = ctx
+
+    engine = create_async_engine(clean_url, poolclass=NullPool, connect_args=connect_args)
+    async with engine.connect() as connection:
+        await connection.run_sync(_do_run_migrations)
+    await engine.dispose()
+
+
+def run_migrations_offline() -> None:
+    clean_url, _ = normalize_database_url_for_asyncpg(get_settings().database_url)
+    context.configure(
+        url=clean_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -90,33 +84,11 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
     )
-
     with context.begin_transaction():
         context.run_migrations()
-
-
-def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            include_object=include_object,
-            include_schemas=False,
-            compare_type=True,
-            compare_server_default=True,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online()
+    asyncio.run(run_migrations_online())
