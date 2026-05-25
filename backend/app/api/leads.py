@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Request

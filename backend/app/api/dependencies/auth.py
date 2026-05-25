@@ -40,9 +40,10 @@ from app.db.session import get_session
 
 logger = structlog.get_logger(__name__)
 
-# HTTPBearer with auto_error=True: a missing/blank/non-bearer Authorization
-# header short-circuits to 401 before our code runs.
-_bearer_scheme = HTTPBearer(auto_error=True, scheme_name="ClerkBearer")
+# HTTPBearer with auto_error=False: a missing/blank/non-bearer Authorization
+# header yields None credentials, which get_current_user maps to a uniform 401
+# (FastAPI's auto_error=True would instead raise 403 on a missing header).
+_bearer_scheme = HTTPBearer(auto_error=False, scheme_name="ClerkBearer")
 
 # Role hierarchy: a caller with a higher-privileged role implicitly satisfies a
 # requirement for any lower-privileged role. owner > agent > viewer.
@@ -151,7 +152,7 @@ async def _provision_user(session: AsyncSession, claims: AuthClaims) -> User:
 
 
 async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer_scheme)],
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)],
     session: Annotated[AsyncSession, Depends(get_session)],
     provider: Annotated[IdentityProvider, Depends(get_identity_provider)],
 ) -> User:
