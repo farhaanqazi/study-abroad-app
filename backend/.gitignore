@@ -1,0 +1,14 @@
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.cleanup_backup/
+logs/
+HANDOFF.md
+HOW_TO_RUN.md
+TUNNEL_SETUP.md
+
+
+.venv310/

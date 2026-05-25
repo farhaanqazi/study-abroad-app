@@ -1,0 +1,45 @@
+# Cleanup backup directory (7-day retention)
+.cleanup_backup/
+
+# AI Context and Development Artifacts
+.ai-context/
+.qwen/
+.qwen-code/
+
+# Documentation - Development & Refactoring (move to .ai-context/)
+REFACTOR-*.md
+TIER*.md
+*-SUMMARY.md
+*-VERIFICATION.md
+MUI-REFACTOR-*.md
+
+# Runtime artifacts
+*.log
+success_url.txt
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Private Planning Documents
+_local/
+.claude/
+

@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: hsl(0 0% 98%);
+  --color-primary-100: hsl(0 0% 90%);
+  --color-primary-200: hsl(0 0% 80%);
+  --color-primary-300: hsl(0 0% 70%);
+  --color-primary-400: hsl(0 0% 60%);
+  --color-primary-500: hsl(0 0% 50%);
+  --color-primary-600: hsl(0 0% 40%);
+  --color-primary-700: hsl(0 0% 25%);
+  --color-primary-800: hsl(0 0% 15%);
+  --color-primary-900: hsl(0 0% 9%);
+
+  --color-neutral-50: hsl(240 5% 96%);
+  --color-neutral-100: hsl(240 5% 90%);
+  --color-neutral-200: hsl(240 4% 80%);
+  --color-neutral-300: hsl(240 4% 65%);
+  --color-neutral-400: hsl(240 3% 50%);
+  --color-neutral-500: hsl(240 2% 40%);
+  --color-neutral-600: hsl(240 2% 30%);
+  --color-neutral-700: hsl(240 2% 20%);
+  --color-neutral-800: hsl(240 3% 12%);
+  --color-neutral-900: hsl(240 5% 6%);
+
+  /* DARK CRAFT: Gold/Amber single accent */
+  --color-accent: hsl(42 100% 53%);
+  --color-accent-hover: hsl(42 100% 45%);
+
+  --color-surface-base: hsl(240 5% 4%);
+  --color-surface-raised: hsl(240 4% 8%);
+  --color-surface-overlay: hsl(240 4% 12%);
+  --color-surface-floating: hsl(240 4% 16%);
+
+  --color-success: hsl(142 70% 45%);
+  --color-success-foreground: hsl(142 70% 10%);
+  --color-warning: hsl(38 92% 50%);
+  --color-danger: hsl(348 83% 47%);
+  --color-danger-foreground: hsl(0 0% 100%);
+  --color-info: hsl(210 100% 60%);
+
+  /* TYPOGRAPHY OVERRIDES */
+  --font-display: 'Outfit Variable', sans-serif;
+  --font-body: 'Outfit Variable', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', monospace;
+
+  /* MODULAR TYPE SCALE */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.5rem;
+  --text-4xl: 3rem;
+
+  /* SPACING */
+  --space-px: 1px;
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* BORDER RADIUS */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* MOTION */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-expo: cubic-bezier(0.7, 0, 0.84, 0);
+
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+
+  /* SHADOWS (Dark Craft glows instead of black drops) */
+  --shadow-color: 240 5% 0%;
+  --shadow-xs: 0 1px 2px hsl(var(--shadow-color) / 0.5);
+  --shadow-sm: 0 1px 3px hsl(var(--shadow-color) / 0.7), 0 1px 2px hsl(var(--shadow-color) / 0.5);
+  --shadow-md: 0 4px 6px hsl(var(--shadow-color) / 0.8), 0 2px 4px hsl(var(--shadow-color) / 0.6);
+  --shadow-lg: 0 10px 15px hsl(var(--shadow-color) / 0.9), 0 4px 6px hsl(var(--shadow-color) / 0.7);
+  --shadow-glow: 0 0 10px hsl(42 100% 53% / 0.15);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-surface-base);
+    color: var(--color-neutral-100);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Force Dark Craft specific hairlines */
+  *, *::before, *::after {
+    border-color: var(--color-neutral-800);
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-surface-base);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-surface-base)];
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity var(--duration-slow) var(--ease-out-expo),
+                transform var(--duration-slow) var(--ease-out-expo);
+  }
+
+  .reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, 
+      var(--color-surface-raised) 25%, 
+      var(--color-surface-overlay) 50%, 
+      var(--color-surface-raised) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  @keyframes shimmer {
+    to { background-position: -200% 0; }
+  }
+}
