@@ -3,6 +3,44 @@
 > Read this first if resuming the stabilization work. It captures plan state that
 > is NOT recoverable from git alone.
 
+## ✅ STATUS — OVERNIGHT RUN COMPLETE (2026-05-25)
+All phases 2→6 done, validated, committed locally (NOT pushed). The app is a
+full-fledged working app against the local disposable DB. Commits on
+`platform/stabilization-saas-foundation`:
+- `b28f1fa` Phase 2+3 — Clerk auth/authz (RS256 JWKS, TenantRequire) + transactional outbox worker
+- `01f603b` Phase 4 — purge salon runtime + rewrite API under `/api/v1`, integrate auth+outbox
+- `e6fc9ac` Phase 5 — fixes from live verification (body resolution, unauth 401)
+
+### Acceptance criteria — all met
+- ✅ `alembic upgrade head` builds 12 tables on fresh `agency_platform_dev`.
+- ✅ `import app.main` clean; uvicorn boots (salon lifespan stripped).
+- ✅ Public `/api/v1/v/{slug}/**` work end-to-end; lead + OutboxEvent persist in ONE txn (verified in DB).
+- ✅ `/api/v1/console/{vendor_id}/**` gated by TenantRequire: unauth→401, malformed→401, wrong-tenant→403, member→pass.
+- ✅ ARQ worker drains outbox (live drain + retry/backoff + terminal FAILED + idempotency).
+- ✅ Frontend `npm run build` succeeds; FastAPI serves the SPA + same-origin `/api/v1`. Public site calls the real endpoints.
+- ✅ Tests authored & passing as standalone runners (pytest not installed): auth unit 12/12, auth integration 8/8, outbox integration 3/3.
+
+### How to run locally
+```
+cd backend
+export DATABASE_URL="postgresql+asyncpg://isafar@localhost:5432/agency_platform_dev?sslmode=disable"
+export ENVIRONMENT=development REDIS_URL="redis://localhost:6379/0"
+dropdb --if-exists agency_platform_dev && createdb agency_platform_dev
+PYTHONPATH=. venv/bin/python -m alembic upgrade head
+PYTHONPATH=. venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+# worker (needs Redis): PYTHONPATH=. venv/bin/arq app.worker.WorkerSettings
+# frontend: cd frontend && npm run build   (or npm run dev)
+```
+
+### Deployment notes / non-blocking follow-ups (decided autonomously, none irreversible)
+- **SMTP**: `.env` Gmail creds are REJECTED (BadCredentials) — live drain correctly retries+parks FAILED. Set working SMTP for real delivery. Worker logic is proven via monkeypatched-sender test (SENT path).
+- **Frontend prod baseURL**: `frontend/.env` bakes `VITE_API_URL=http://localhost:8000` into the bundle. For same-origin SPA-served prod, build with `VITE_API_URL` unset (api.ts already falls back to relative `/api/v1`). Left the dev `.env` untouched.
+- **Prod env**: `ENVIRONMENT=production` fail-fasts unless `CLERK_ISSUER`+`CLERK_AUDIENCE` set and `DATABASE_URL` has no placeholders (by design).
+- **pytest/ruff/uv/Docker/py3.12** still absent in this env (venv is py3.10); tests run as standalone scripts. Validate in CI.
+- Console currently exposes leads (read) + cost-settings (CRUD). Member-management / site-config console routes are future work, not in the acceptance set.
+
+---
+
 ## OVERNIGHT MANDATE (read first)
 The user is asleep and wants this driven to a **full-fledged working app**, autonomously, in
 one continuous run. Don't stop for routine confirmations. "Working app" = acceptance criteria:
@@ -26,10 +64,11 @@ with the next independent task. Keep this doc + the todo list updated as you go.
 - ✅ **Phase 0** — Foundation: `backend/pyproject.toml` (uv, requires-python>=3.12), root `docker-compose.yml`, Clerk fields + prod fail-fast in `app/core/config.py`, `app/db/session.py` (echo=False, `get_session`, `session_scope`), `Base.metadata` naming_convention in `app/db/models/common.py`.
 - ✅ **Phase 1** — Models: `app/db/models/tenant.py` (User+clerk_id, Vendor+business_name, VendorMembership M2M unique+composite idx, VendorSiteConfig JSONB), `app/db/models/outbox.py` (OutboxEvent, ProcessedEvent). `UserRole` → owner/agent/viewer; added `OutboxStatus`. Salon `vendor.py`/`user.py` models deleted. `__init__.py` + `base.py` rewired.
 - ✅ **Phase 1b** — Clean Alembic: `env.py` runs async (asyncpg, no psycopg2); 3 salon migrations deleted; single baseline; enum lifecycle made repeatable (create at top of upgrade w/ checkfirst, drop at end of downgrade).
-- ⏭️ **Phase 2 (NEXT) — Auth & Authz** — NOT STARTED. Was about to delegate to a sub-agent (prompt below). Owns ONLY: `app/core/auth/{__init__,protocol,clerk_provider}.py`, `app/api/dependencies/{__init__,auth}.py`, `tests/unit/test_auth_provider.py`, `tests/integration/test_auth_authz.py`.
-- ⏭️ **Phase 3 — Async task infra** — NOT STARTED. Sub-agent owns ONLY: `app/tasks/{__init__,arq_settings,outbox_processor,senders}.py`, `app/worker.py`, `app/services/leads.py`, `app/core/observability.py`, `tests/integration/test_outbox_worker.py`.
-- ⏭️ **Phase 4 — Legacy purge + API rewrite** — NOT STARTED. Remove salon runtime: `app/llm/`, `app/messaging/`, `app/services/conversation_service.py`, salon schemas (`app/schemas/state.py`,`messages.py`), salon enums (AppointmentStatus/ConversationStep/NotificationJob*/ChannelType/DigestPreference), `sql/`, `run_migration.py`, `backend/docs/horizon-reference/`. Rewrite routers under `/api/v1/console/**` with `TenantRequire`; public lead routes delegate to LeadCaptureService. Fix importers that referenced deleted `app.db.models.vendor`/`user` (e.g. `app/api/leads.py`, `app/api/vendor_console.py`, `app/api/deps.py`, `app/api/webhooks.py`, `app/main.py`).
-- ⏭️ **Phase 5 — Integration tests + final verification** — NOT STARTED.
+- ✅ **Phase 2 — Auth & Authz** — DONE (`b28f1fa`). `app/core/auth/{__init__,protocol,clerk_provider}.py`, `app/api/dependencies/{__init__,auth}.py` + tests. RS256-only JWKS, lazy provisioning, `TenantRequire(owner>agent>viewer)`. (Phase 5 set HTTPBearer `auto_error=False` so missing header → 401.)
+- ✅ **Phase 3 — Async task infra** — DONE (`b28f1fa`). `app/tasks/*`, `app/worker.py`, `app/services/leads.py`, `app/core/observability.py` + test. Transactional outbox, `FOR UPDATE SKIP LOCKED` drain, exp-backoff retries, ProcessedEvent idempotency, cron drain every 10s.
+- ✅ **Phase 4 — Legacy purge + API rewrite** — DONE (`01f603b`). Removed `app/llm/`, `app/messaging/`, conversation/webhook/tenant/email services, salon schemas, `app/redis/state_store.py`, `app/api/webhooks.py`, salon enums, `sql/`, `run_migration.py`. Public leads → LeadCaptureService; console → `/api/v1/console/{vendor_id}/**` + TenantRequire. All importers fixed (`tenant.Vendor`, `vendor.business_name`).
+- ✅ **Phase 5 — Integration tests + final verification** — DONE (`e6fc9ac`). Live end-to-end on local DB + 23 authored checks pass. See status block at top.
+- ✅ **Phase 6 — Frontend** — DONE (no source change needed; already wired to `/api/v1`). `npm run build` green; FastAPI serves the SPA + deep links same-origin.
 
 ## Critical environment gotchas (verified 2026-05-25)
 - **No Docker, no `uv`, no Python 3.12** here. venv is Python 3.10. So `docker-compose.yml`/`pyproject.toml` are AUTHORED but NOT runtime-validated here — validate on your machine/CI.
