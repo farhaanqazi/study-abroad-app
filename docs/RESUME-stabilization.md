@@ -3,6 +3,34 @@
 > Read this first if resuming the stabilization work. It captures plan state that
 > is NOT recoverable from git alone.
 
+## ✅ STATUS — PLATFORM ADMIN CONSOLE INITIATIVE COMPLETE (2026-05-26)
+A second initiative (on top of the stabilization rebuild) added a **platform
+back-office** + **gated workspace provisioning**. All phases A–F done, validated,
+committed locally (NOT pushed) on `platform/stabilization-saas-foundation`:
+- `632907e` A — platform auth tier (PlatformRole none/support/admin/superadmin),
+  WorkspaceRequest + AuditLog models, migration 0002, `PlatformRequire`, fail-closed
+  env bootstrap (`PLATFORM_SUPERADMINS`), `/me.platform_role`
+- `4c4a704` B — workspace request → admin approve/reject (transactional provision)
+- `f5611d1` C/D schema — Invitation + SupportTicket models, migration 0003
+- `885760f` C/D — 21 `/api/v1/admin/**` routes (vendors/members/users/ops/audit/
+  read-only-view-as/support), all PlatformRequire-gated + audited
+- `e11ba5b` E — admin console frontend (`/admin` route tree, role-gated UI) +
+  ConsoleHome "Request a workspace" empty-state
+- Phase F — `tests/conftest.py` (per-test engine reset fixes async-loop reuse),
+  rewrote stale `test_config_validators.py` to the Clerk contract, added
+  `test_admin_authz_matrix.py` (authz matrix + approval e2e). **55 tests pass**
+  (`pytest` now installed in venv). insecure-defaults sweep: no new fail-open.
+
+**Become the first admin:** set `PLATFORM_SUPERADMINS=<your clerk_id-or-email>` in
+env (see backend/.env.example) and log in — auto-granted superadmin. Or run
+`PYTHONPATH=. python scripts/grant_platform_role.py <email|clerk_id> superadmin`.
+**Run tests:** `createdb agency_test && DATABASE_URL=...agency_test... alembic upgrade head`,
+then `PYTHONPATH=. venv/bin/python -m pytest`. Migration head is now `b49ef0fcc0b4` (0003).
+**Known pre-existing (not from this work):** Supabase `CERT_NONE` SSL workaround in
+db/session.py; Clerk default session token omits `email` (we fall back to a
+placeholder — add an `email` claim in Clerk to fix); dead salon config in .env.example
+(telegram/whatsapp) can be pruned.
+
 ## ✅ STATUS — OVERNIGHT RUN COMPLETE (2026-05-25)
 All phases 2→6 done, validated, committed locally (NOT pushed). The app is a
 full-fledged working app against the local disposable DB. Commits on
