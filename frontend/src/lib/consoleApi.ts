@@ -13,7 +13,7 @@ const baseURL = import.meta.env.VITE_API_URL ?? '';
 
 // Separate axios instance for authenticated console calls so public requests
 // never carry an Authorization header.
-const consoleClient = axios.create({ baseURL });
+export const consoleClient = axios.create({ baseURL });
 
 // A token provider is injected at runtime by <ClerkTokenBridge> (which lives
 // inside <ClerkProvider> and has access to Clerk's getToken). Kept at module
@@ -43,9 +43,12 @@ export interface Membership {
   role: 'owner' | 'agent' | 'viewer';
 }
 
+export type PlatformRole = 'none' | 'support' | 'admin' | 'superadmin';
+
 export interface Me {
   id: string;
   email: string;
+  platform_role: PlatformRole;
   memberships: Membership[];
 }
 
@@ -203,5 +206,34 @@ export async function saveSiteDraft(vendorId: string, config: SiteConfig): Promi
 
 export async function publishSite(vendorId: string): Promise<SiteConfigState> {
   const { data } = await consoleClient.post<SiteConfigState>(`${consoleBase(vendorId)}/site/publish`, {});
+  return data;
+}
+
+// --- Workspace requests (any authed user) -----------------------------------
+
+export interface WorkspaceRequest {
+  id: string;
+  business_name: string;
+  desired_slug: string;
+  justification: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  rejection_reason: string | null;
+  created_vendor_id: string | null;
+  created_at: string;
+}
+
+export interface WorkspaceRequestInput {
+  business_name: string;
+  desired_slug: string;
+  justification?: string;
+}
+
+export async function createWorkspaceRequest(body: WorkspaceRequestInput): Promise<WorkspaceRequest> {
+  const { data } = await consoleClient.post<WorkspaceRequest>(`${API_PREFIX}/workspace-requests`, body);
+  return data;
+}
+
+export async function listMyWorkspaceRequests(): Promise<WorkspaceRequest[]> {
+  const { data } = await consoleClient.get<WorkspaceRequest[]>(`${API_PREFIX}/workspace-requests/mine`);
   return data;
 }

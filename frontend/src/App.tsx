@@ -9,6 +9,17 @@ const LeadsDashboard = lazy(() => import('./pages/Console/LeadsDashboard'));
 const CostSettingsPage = lazy(() => import('./pages/Console/CostSettingsPage'));
 const SiteEditorPage = lazy(() => import('./pages/Console/SiteEditorPage'));
 
+// Platform back-office admin console
+const RequirePlatformAdmin = lazy(() => import('./pages/Admin/RequirePlatformAdmin'));
+const AdminLayout = lazy(() => import('./pages/Admin/AdminLayout'));
+const AdminOverview = lazy(() => import('./pages/Admin/AdminOverview'));
+const WorkspaceRequestsQueue = lazy(() => import('./pages/Admin/WorkspaceRequestsQueue'));
+const VendorsList = lazy(() => import('./pages/Admin/VendorsList'));
+const VendorDetail = lazy(() => import('./pages/Admin/VendorDetail'));
+const UsersList = lazy(() => import('./pages/Admin/UsersList'));
+const AuditLogViewer = lazy(() => import('./pages/Admin/AuditLogViewer'));
+const SupportTickets = lazy(() => import('./pages/Admin/SupportTickets'));
+
 const Home = () => (
   <div className="flex min-h-screen items-center justify-center p-8 bg-[var(--color-surface-base)]">
     <div className="max-w-xl text-center">
@@ -50,6 +61,24 @@ const App = () => (
         <Route path="site" element={<SiteEditorPage />} />
         <Route path="leads" element={<LeadsDashboard />} />
         <Route path="cost-settings" element={<CostSettingsPage />} />
+      </Route>
+
+      {/* Platform back-office admin console */}
+      <Route
+        path="/admin"
+        element={
+          <RequirePlatformAdmin>
+            <AdminLayout />
+          </RequirePlatformAdmin>
+        }
+      >
+        <Route index element={<AdminOverview />} />
+        <Route path="requests" element={<WorkspaceRequestsQueue />} />
+        <Route path="vendors" element={<VendorsList />} />
+        <Route path="vendors/:vendorId" element={<VendorDetail />} />
+        <Route path="users" element={<UsersList />} />
+        <Route path="audit" element={<AuditLogViewer />} />
+        <Route path="support" element={<SupportTickets />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
