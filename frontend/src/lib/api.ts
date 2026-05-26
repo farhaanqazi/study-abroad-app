@@ -18,10 +18,31 @@ export interface SubmitAck {
   id: string;
 }
 
+export interface SiteHero {
+  headline: string;
+  subheadline: string;
+  cta_label: string;
+}
+
+export interface SiteSections {
+  show_stats: boolean;
+  show_cost_calculator: boolean;
+  show_application: boolean;
+  show_callback: boolean;
+}
+
+export interface SiteConfig {
+  hero: SiteHero;
+  about: string;
+  primary_color: string;
+  sections: SiteSections;
+}
+
 export interface PublicConfig {
   vendor_name: string;
   vendor_slug: string;
   business_email?: string | null;
+  site: SiteConfig;
 }
 
 export interface Stats {

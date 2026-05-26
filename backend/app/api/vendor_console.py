@@ -11,6 +11,7 @@ from app.api.deps import get_db
 from app.api.dependencies.auth import TenantContext, TenantRequire
 from app.core.enums import UserRole
 from app.db.models.leads import Application, Callback, CostEstimate, Inquiry
+from app.db.models.tenant import VendorSiteConfig
 from app.db.models.vendor_cost import VendorCostSetting
 from app.schemas.leads import (
     ApplicationOut,
@@ -20,6 +21,7 @@ from app.schemas.leads import (
     VendorCostSettingIn,
     VendorCostSettingOut,
 )
+from app.schemas.site import SiteConfig, SiteConfigState
 
 # Authenticated, tenant-scoped management console. Every route is gated by a
 # TenantRequire dependency: the caller must present a valid Clerk token (401 if
@@ -160,3 +162,62 @@ async def delete_cost_setting(
         raise HTTPException(status_code=404, detail="Cost setting not found.")
     await db.delete(row)
     await db.commit()
+
+
+# --- Site configuration (draft → publish) -----------------------------------
+
+def _state(row: VendorSiteConfig | None) -> SiteConfigState:
+    """Build the GET response from a (possibly missing) config row."""
+    if row is None:
+        return SiteConfigState(
+            published=SiteConfig(), draft=None, version=0, has_unpublished_changes=False
+        )
+    return SiteConfigState(
+        published=SiteConfig.model_validate(row.config or {}),
+        draft=SiteConfig.model_validate(row.draft_config) if row.draft_config else None,
+        version=row.version,
+        has_unpublished_changes=row.draft_config is not None,
+    )
+
+
+@router.get("/site", response_model=SiteConfigState)
+async def get_site_config(
+    ctx: TenantContext = Depends(require_viewer),
+    db: AsyncSession = Depends(get_db),
+):
+    return _state(await db.get(VendorSiteConfig, ctx.vendor_id))
+
+
+@router.put("/site/draft", response_model=SiteConfigState)
+async def save_site_draft(
+    payload: SiteConfig,
+    ctx: TenantContext = Depends(require_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await db.get(VendorSiteConfig, ctx.vendor_id)
+    if row is None:
+        row = VendorSiteConfig(vendor_id=ctx.vendor_id, config={}, draft_config=payload.model_dump())
+        db.add(row)
+    else:
+        row.draft_config = payload.model_dump()
+        row.updated_by = ctx.user.id
+    await db.commit()
+    await db.refresh(row)
+    return _state(row)
+
+
+@router.post("/site/publish", response_model=SiteConfigState)
+async def publish_site(
+    ctx: TenantContext = Depends(require_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await db.get(VendorSiteConfig, ctx.vendor_id)
+    if row is None or row.draft_config is None:
+        raise HTTPException(status_code=409, detail="Nothing to publish — save a draft first.")
+    row.config = row.draft_config
+    row.draft_config = None
+    row.version = (row.version or 0) + 1
+    row.updated_by = ctx.user.id
+    await db.commit()
+    await db.refresh(row)
+    return _state(row)

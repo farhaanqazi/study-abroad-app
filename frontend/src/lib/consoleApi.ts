@@ -1,5 +1,7 @@
 import axios from 'axios';
-import { API_PREFIX } from './api';
+import { API_PREFIX, type SiteConfig } from './api';
+
+export type { SiteConfig } from './api';
 
 // Whether Clerk is configured at build time. When false, the console renders a
 // "not configured" notice instead of mounting Clerk hooks — the public site is
@@ -178,4 +180,28 @@ export async function updateCostSetting(
 
 export async function deleteCostSetting(vendorId: string, settingId: string): Promise<void> {
   await consoleClient.delete(`${consoleBase(vendorId)}/cost-settings/${settingId}`);
+}
+
+// --- Site configuration -----------------------------------------------------
+
+export interface SiteConfigState {
+  published: SiteConfig;
+  draft: SiteConfig | null;
+  version: number;
+  has_unpublished_changes: boolean;
+}
+
+export async function getSiteConfig(vendorId: string): Promise<SiteConfigState> {
+  const { data } = await consoleClient.get<SiteConfigState>(`${consoleBase(vendorId)}/site`);
+  return data;
+}
+
+export async function saveSiteDraft(vendorId: string, config: SiteConfig): Promise<SiteConfigState> {
+  const { data } = await consoleClient.put<SiteConfigState>(`${consoleBase(vendorId)}/site/draft`, config);
+  return data;
+}
+
+export async function publishSite(vendorId: string): Promise<SiteConfigState> {
+  const { data } = await consoleClient.post<SiteConfigState>(`${consoleBase(vendorId)}/site/publish`, {});
+  return data;
 }

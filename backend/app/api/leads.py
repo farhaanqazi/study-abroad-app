@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_app_settings, get_db
 from app.core.config import Settings
 from app.db.models.leads import Application
-from app.db.models.tenant import Vendor
+from app.db.models.tenant import Vendor, VendorSiteConfig
 from app.db.models.vendor_cost import VendorCostSetting
 from app.middleware.rate_limiter import limiter
 from app.schemas.leads import (
@@ -23,6 +23,7 @@ from app.schemas.leads import (
     StatsOut,
     SubmitAck,
 )
+from app.schemas.site import SiteConfig
 from app.services.leads import (
     ApplicationIn,
     CallbackIn,
@@ -172,12 +173,16 @@ async def log_qr(
 @router.get("/config", response_model=PublicConfigOut)
 async def get_public_config(
     vendor: Vendor = Depends(resolve_vendor),
+    db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_app_settings),
 ) -> PublicConfigOut:
+    row = await db.get(VendorSiteConfig, vendor.id)
+    site = SiteConfig.model_validate(row.config) if row and row.config else SiteConfig()
     return PublicConfigOut(
         vendor_name=vendor.business_name,
         vendor_slug=vendor.slug,
         business_email=settings.business_email or None,
+        site=site,
     )
 
 

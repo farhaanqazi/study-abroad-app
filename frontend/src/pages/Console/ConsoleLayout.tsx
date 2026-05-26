@@ -1,10 +1,11 @@
 import { NavLink, Outlet, useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { UserButton } from '@clerk/react';
-import { Inbox, Settings, ArrowLeft } from 'lucide-react';
+import { Inbox, Settings, ArrowLeft, Palette } from 'lucide-react';
 import { getMe } from '@/lib/consoleApi';
 
 const navItems = [
+  { to: 'site', label: 'Site', icon: Palette },
   { to: 'leads', label: 'Leads', icon: Inbox },
   { to: 'cost-settings', label: 'Cost settings', icon: Settings },
 ];

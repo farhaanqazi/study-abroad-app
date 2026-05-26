@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
+from app.schemas.site import SiteConfig
+
 # Lightweight email check (email-validator is not a dependency, so we avoid
 # pydantic's EmailStr). Mirrors Horizon's hand-rolled isEmail.
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -100,6 +102,7 @@ class PublicConfigOut(BaseModel):
     vendor_name: str
     vendor_slug: str
     business_email: Optional[str] = None
+    site: "SiteConfig" = Field(default_factory=lambda: SiteConfig())
 
 
 class StatsOut(BaseModel):

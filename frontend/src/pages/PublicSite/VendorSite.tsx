@@ -10,12 +10,6 @@ import CostCalculator from './CostCalculator';
 
 type Tab = 'inquiry' | 'callback' | 'application';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'inquiry', label: 'Ask a question' },
-  { id: 'callback', label: 'Request a callback' },
-  { id: 'application', label: 'Start an application' },
-];
-
 export default function VendorSite() {
   const { vendorSlug = '' } = useParams();
   const [tab, setTab] = useState<Tab>('inquiry');
@@ -53,6 +47,15 @@ export default function VendorSite() {
     );
   }
 
+  // Render from the vendor's published site config, with sensible fallbacks.
+  const site = config.site;
+  const primary = site.primary_color || '#171717';
+  const headline = site.hero.headline?.trim() || config.vendor_name;
+  const subheadline =
+    site.hero.subheadline?.trim() ||
+    'Your gateway to studying abroad. Tell us your goals and our counsellors will guide you from application to arrival.';
+  const ctaLabel = site.hero.cta_label?.trim() || 'Get started';
+
   const statItems = stats
     ? [
         { icon: GraduationCap, value: stats.students.toLocaleString(), label: 'Students guided' },
@@ -62,6 +65,13 @@ export default function VendorSite() {
       ]
     : [];
 
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'inquiry', label: 'Ask a question' },
+    ...(site.sections.show_callback ? [{ id: 'callback' as Tab, label: 'Request a callback' }] : []),
+    ...(site.sections.show_application ? [{ id: 'application' as Tab, label: 'Start an application' }] : []),
+  ];
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'inquiry';
+
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       {/* Hero */}
@@ -70,30 +80,30 @@ export default function VendorSite() {
           <span className="inline-block rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-500">
             Study Abroad Counselling
           </span>
-          <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-6xl">{config.vendor_name}</h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-neutral-500">
-            Your gateway to studying abroad. Tell us your goals and our counsellors will guide you
-            from application to arrival.
-          </p>
+          <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-6xl">{headline}</h1>
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-neutral-500">{subheadline}</p>
           <div className="mt-8 flex justify-center gap-3">
             <a
               href="#get-started"
-              className="rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-700"
+              className="rounded-lg px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
+              style={{ backgroundColor: primary }}
             >
-              Get started
+              {ctaLabel}
             </a>
-            <a
-              href="#cost"
-              className="rounded-lg border border-neutral-300 px-6 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
-            >
-              Estimate my costs
-            </a>
+            {site.sections.show_cost_calculator && (
+              <a
+                href="#cost"
+                className="rounded-lg border border-neutral-300 px-6 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+              >
+                Estimate my costs
+              </a>
+            )}
           </div>
         </div>
       </section>
 
       {/* Stats */}
-      {statItems.length > 0 && (
+      {site.sections.show_stats && statItems.length > 0 && (
         <section className="border-b border-neutral-100">
           <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 px-6 py-12 sm:grid-cols-4">
             {statItems.map(({ icon: Icon, value, label }) => (
@@ -107,18 +117,30 @@ export default function VendorSite() {
         </section>
       )}
 
-      {/* Cost calculator */}
-      <section id="cost" className="border-b border-neutral-100 bg-neutral-50/50">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <div className="mb-8 text-center">
-            <h2 className="text-3xl font-semibold">What will it cost?</h2>
-            <p className="mt-2 text-neutral-500">
-              Get an instant, personalised estimate of tuition and living costs.
-            </p>
+      {/* About */}
+      {site.about?.trim() && (
+        <section className="border-b border-neutral-100">
+          <div className="mx-auto max-w-3xl px-6 py-16 text-center">
+            <h2 className="mb-4 text-2xl font-semibold">About us</h2>
+            <p className="whitespace-pre-line text-lg leading-relaxed text-neutral-600">{site.about}</p>
           </div>
-          <CostCalculator vendorSlug={config.vendor_slug} />
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Cost calculator */}
+      {site.sections.show_cost_calculator && (
+        <section id="cost" className="border-b border-neutral-100 bg-neutral-50/50">
+          <div className="mx-auto max-w-5xl px-6 py-20">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-semibold">What will it cost?</h2>
+              <p className="mt-2 text-neutral-500">
+                Get an instant, personalised estimate of tuition and living costs.
+              </p>
+            </div>
+            <CostCalculator vendorSlug={config.vendor_slug} />
+          </div>
+        </section>
+      )}
 
       {/* Contact / lead forms */}
       <section id="get-started" className="mx-auto max-w-xl px-6 py-20">
@@ -127,23 +149,25 @@ export default function VendorSite() {
           However suits you best — we usually reply within a day.
         </p>
 
-        <div className="mb-6 flex rounded-lg border border-neutral-200 bg-neutral-50 p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
-                tab === t.id ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {tabs.length > 1 && (
+          <div className="mb-6 flex rounded-lg border border-neutral-200 bg-neutral-50 p-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                  activeTab === t.id ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {tab === 'inquiry' && <InquiryForm vendorSlug={config.vendor_slug} />}
-        {tab === 'callback' && <CallbackForm vendorSlug={config.vendor_slug} />}
-        {tab === 'application' && <ApplicationForm vendorSlug={config.vendor_slug} />}
+        {activeTab === 'inquiry' && <InquiryForm vendorSlug={config.vendor_slug} />}
+        {activeTab === 'callback' && <CallbackForm vendorSlug={config.vendor_slug} />}
+        {activeTab === 'application' && <ApplicationForm vendorSlug={config.vendor_slug} />}
       </section>
 
       {/* Footer */}

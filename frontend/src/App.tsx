@@ -7,6 +7,7 @@ const ConsoleHome = lazy(() => import('./pages/Console/ConsoleHome'));
 const ConsoleLayout = lazy(() => import('./pages/Console/ConsoleLayout'));
 const LeadsDashboard = lazy(() => import('./pages/Console/LeadsDashboard'));
 const CostSettingsPage = lazy(() => import('./pages/Console/CostSettingsPage'));
+const SiteEditorPage = lazy(() => import('./pages/Console/SiteEditorPage'));
 
 const Home = () => (
   <div className="flex min-h-screen items-center justify-center p-8 bg-[var(--color-surface-base)]">
@@ -45,7 +46,8 @@ const App = () => (
           </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="leads" replace />} />
+        <Route index element={<Navigate to="site" replace />} />
+        <Route path="site" element={<SiteEditorPage />} />
         <Route path="leads" element={<LeadsDashboard />} />
         <Route path="cost-settings" element={<CostSettingsPage />} />
       </Route>
