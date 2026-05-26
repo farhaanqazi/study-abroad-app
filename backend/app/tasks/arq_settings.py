@@ -54,7 +54,7 @@ async def drain_outbox_job(ctx: dict[str, Any]) -> dict[str, int]:
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    configure_logging()
+    configure_logging(get_settings())
     logger.info("worker_startup", interval_seconds=DRAIN_INTERVAL_SECONDS)
 
 

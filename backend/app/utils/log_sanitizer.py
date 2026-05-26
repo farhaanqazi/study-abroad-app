@@ -61,3 +61,34 @@ def sanitize_value(value: Any) -> Any:
 
 def sanitize_fields(fields: dict[str, Any]) -> dict[str, Any]:
     return sanitize_value(fields)
+
+
+def _redact_secret_text(text: str) -> str:
+    """Strip credentials from free text WITHOUT touching emails/phones.
+
+    Used by the structured-logging pipeline, where emails/phone numbers are
+    often exactly the values you need to debug a lead — so unlike
+    :func:`sanitize_text` this keeps them and only removes true secrets.
+    """
+    redacted = BEARER_TOKEN_RE.sub(r"\1[REDACTED]", text)
+    redacted = API_KEY_RE.sub(lambda m: f"{m.group(1)}=[REDACTED]", redacted)
+    redacted = CARD_NUMBER_RE.sub("[REDACTED_CARD]", redacted)
+    return redacted
+
+
+def redact_log_event(event_dict: dict[str, Any]) -> dict[str, Any]:
+    """Sanitize a structlog event dict in place and return it.
+
+    - Values under a sensitive key (password/token/secret/authorization/...) are
+      fully replaced with ``[REDACTED]``.
+    - String values are scrubbed of bearer tokens, API keys and card numbers.
+    Emails and phone numbers are intentionally preserved for debuggability.
+    """
+    for key, value in list(event_dict.items()):
+        key_lower = str(key).lower()
+        key_compact = re.sub(r"[^a-z0-9]", "", key_lower)
+        if key_lower in SENSITIVE_KEYS or key_compact in SENSITIVE_KEYS_COMPACT:
+            event_dict[key] = REDACTED
+        elif isinstance(value, str):
+            event_dict[key] = _redact_secret_text(value)
+    return event_dict

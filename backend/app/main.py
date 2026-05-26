@@ -20,7 +20,7 @@ from starlette.middleware.errors import ServerErrorMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
-from app.core.logging_config import setup_logging
+from app.core.observability import configure_logging, get_logger
 from app.db.session import db_session
 from app.middleware.exception_handler import build_exception_handler
 from app.middleware.rate_limiter import limiter as shared_limiter
@@ -28,12 +28,11 @@ from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.request_timing import RequestTimingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.redis.client import build_redis_client
-from app.utils.logger import app_logger
 
 
-# Configure logging before anything else
-setup_logging()
-logger = logging.getLogger(__name__)
+# Configure logging before anything else.
+configure_logging(get_settings())
+logger = get_logger("app.main")
 
 
 @asynccontextmanager
@@ -177,9 +176,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     # Only log 4xx errors that indicate security events (not routine 404s)
     if exc.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}:
         event_type = "auth_failure" if exc.status_code == 401 else "authorization_failure"
-        app_logger.warn(
+        logger.warning(
             f"HTTP {exc.status_code}: {exc.detail}",
-            event=event_type,
+            event_type=event_type,
             request_id=request_id,
             path=str(request.url.path),
             method=request.method,
@@ -202,9 +201,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     request_id = getattr(request.state, "request_id", "unknown")
     
-    app_logger.warn(
+    logger.warning(
         "Request validation failed",
-        event="validation_error",
+        event_type="validation_error",
         request_id=request_id,
         path=str(request.url.path),
         method=request.method,
