@@ -119,16 +119,16 @@ async def _provision_user(session: AsyncSession, claims: AuthClaims) -> User:
     and re-read the row the winner committed.
     """
     clerk_id = claims.clerk_id
-    email = claims.email
+    # Prefer the real email claim. Clerk's DEFAULT session token doesn't include
+    # one, so fall back to a stable, unique placeholder derived from the clerk_id
+    # — enough to provision (email is NOT NULL + unique) without forcing every
+    # deployment to customize Clerk's session-token claims. Add `email` to the
+    # Clerk session token to get real addresses in the console.
+    email = claims.email or f"{clerk_id}@users.noreply.clerk"
 
     existing = await session.scalar(select(User).where(User.clerk_id == clerk_id))
     if existing is not None:
         return existing
-
-    if not email:
-        # email is NOT NULL on User and is the secondary identity key; without it
-        # we cannot provision. Fail closed (treated as auth failure upstream).
-        raise AuthError(reason="token missing email claim; cannot provision user")
 
     user = User(clerk_id=clerk_id, email=email)
     session.add(user)

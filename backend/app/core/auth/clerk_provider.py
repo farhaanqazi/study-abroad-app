@@ -69,19 +69,22 @@ class ClerkProvider:
         self._cache = _JWKSCache(self._settings.clerk_jwks_cache_ttl_seconds)
 
     # ------------------------------------------------------------------ config
-    def _require_config(self) -> tuple[str, str, str]:
-        """Return (jwks_url, issuer, audience) or fail closed if any is missing."""
+    def _require_config(self) -> tuple[str, str, Optional[str]]:
+        """Return (jwks_url, issuer, audience) or fail closed if required ones missing.
+
+        ``jwks_url`` and ``issuer`` are REQUIRED — without them a token cannot be
+        verified at all. ``audience`` is OPTIONAL: Clerk's default session tokens
+        carry no ``aud`` claim, so when ``CLERK_AUDIENCE`` is unset we skip the
+        audience check (signature + issuer + expiry still bind the token to this
+        Clerk instance). When it IS set, ``aud`` is enforced.
+        """
         s = self._settings
         jwks_url = s.effective_clerk_jwks_url
         issuer = s.clerk_issuer
         audience = s.clerk_audience
         missing = [
             name
-            for name, val in (
-                ("jwks_url", jwks_url),
-                ("issuer", issuer),
-                ("audience", audience),
-            )
+            for name, val in (("jwks_url", jwks_url), ("issuer", issuer))
             if not val
         ]
         if missing:
@@ -159,11 +162,12 @@ class ClerkProvider:
                 token,
                 public_key,
                 algorithms=_ALLOWED_ALGORITHMS,  # pin RS256 — no caller override
-                audience=audience,
+                audience=audience,  # None when CLERK_AUDIENCE unset
                 issuer=issuer,
                 options={
                     "verify_signature": True,
-                    "verify_aud": True,
+                    # Only enforce aud when an expected audience is configured.
+                    "verify_aud": audience is not None,
                     "verify_iss": True,
                     "verify_exp": True,
                     "verify_nbf": True,

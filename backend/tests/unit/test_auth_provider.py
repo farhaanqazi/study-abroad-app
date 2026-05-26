@@ -236,12 +236,22 @@ async def test_misconfiguration_fails_closed():
     except AuthError:
         pass
 
-    provider2, _ = _provider_serving([pub], audience=None)
+    # Missing jwks_url => cannot fetch keys => fail closed.
+    provider2, _ = _provider_serving([pub], jwks_url=None)
     try:
         await provider2.verify(_token(priv, "k1"))
-        raise AssertionError("expected AuthError when audience missing")
+        raise AssertionError("expected AuthError when jwks_url missing")
     except AuthError:
         pass
+
+
+async def test_audience_optional_when_unset():
+    # CLERK_AUDIENCE unset => aud is NOT enforced; a token still verifies on
+    # signature + issuer + expiry alone (Clerk default session tokens have no aud).
+    priv, pub = _make_keypair("k1")
+    provider, _ = _provider_serving([pub], audience=None)
+    claims = await provider.verify(_token(priv, "k1", aud="anything-or-nothing"))
+    assert claims.subject == "user_abc"
 
     provider3, _ = _provider_serving([pub], jwks_url=None)
     try:
@@ -274,6 +284,7 @@ _TESTS = [
     test_not_yet_valid_rejected,
     test_wrong_signing_key_rejected,
     test_misconfiguration_fails_closed,
+    test_audience_optional_when_unset,
     test_malformed_token_rejected,
 ]
 
