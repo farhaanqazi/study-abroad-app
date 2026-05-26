@@ -1,8 +1,11 @@
 import time
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
 
-from app.utils.logger import app_logger
+from app.core.observability import get_logger
+
+logger = get_logger("app.request")
 
 
 class RequestTimingMiddleware(BaseHTTPMiddleware):
@@ -11,16 +14,18 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        duration = time.perf_counter() - start
-        duration_ms = duration * 1_000
+        duration_ms = (time.perf_counter() - start) * 1_000
 
-        app_logger.info(
-            "Request completed",
-            event="request_latency",
+        # request_id is set on scope state by the inner RequestIDMiddleware;
+        # read it explicitly since BaseHTTPMiddleware runs outside the contextvar
+        # scope where it's bound.
+        logger.info(
+            "request_completed",
+            request_id=getattr(request.state, "request_id", None),
             method=request.method,
             path=request.url.path,
             status_code=response.status_code,
-            duration_ms=f"{duration_ms:.2f}ms",
+            duration_ms=round(duration_ms, 2),
         )
 
         return response

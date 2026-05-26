@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.utils.logger import set_request_id_context
+from app.core.observability import bind_request_context, clear_request_context
 
 
 _HEX_RE = re.compile(r"[a-fA-F0-9]")
@@ -55,8 +55,11 @@ class RequestIDMiddleware:
             scope["state"] = {}
         scope["state"]["request_id"] = request_id
 
-        # Set in contextvar for automatic log injection
-        set_request_id_context(request_id)
+        # Bind into structlog contextvars so every log line in this request
+        # carries request_id automatically. Cleared in `finally` to avoid
+        # leaking the id into a later request that reuses the context.
+        clear_request_context()
+        bind_request_context(request_id=request_id)
 
         # Intercept response messages to add X-Request-ID header
         async def send_with_request_id(message: Message) -> None:
@@ -66,4 +69,7 @@ class RequestIDMiddleware:
                 message = {**message, "headers": headers}
             await send(message)
 
-        await self.app(scope, receive, send_with_request_id)
+        try:
+            await self.app(scope, receive, send_with_request_id)
+        finally:
+            clear_request_context()

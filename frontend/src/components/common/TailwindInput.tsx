@@ -24,6 +24,23 @@ const TailwindInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Tailwin
     const [isFocused, setIsFocused] = React.useState(false);
     const [hasValue, setHasValue] = React.useState(!!value || !!defaultValue);
 
+    // Merge the forwarded ref with an internal one so we can read the DOM value
+    // on mount. react-hook-form populates uncontrolled fields via the ref (not
+    // the value/defaultValue props), so without this the label wouldn't float
+    // over a pre-filled value (e.g. in an edit modal) until focused.
+    const innerRef = React.useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+    const setRefs = React.useCallback(
+      (node: HTMLInputElement | HTMLTextAreaElement | null) => {
+        innerRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) (ref as React.MutableRefObject<typeof node>).current = node;
+      },
+      [ref],
+    );
+    React.useEffect(() => {
+      if (innerRef.current && innerRef.current.value) setHasValue(true);
+    }, []);
+
     const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setIsFocused(true);
       if (onFocus) onFocus(e as React.FocusEvent<HTMLInputElement>);
@@ -51,7 +68,7 @@ const TailwindInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Tailwin
           <div className="relative">
             <textarea
               id={inputId}
-              ref={ref as React.Ref<HTMLTextAreaElement>}
+              ref={setRefs as React.Ref<HTMLTextAreaElement>}
               disabled={disabled}
               value={value}
               defaultValue={defaultValue}
@@ -112,7 +129,7 @@ const TailwindInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, Tailwin
         <div className="relative">
           <input
             id={inputId}
-            ref={ref as React.Ref<HTMLInputElement>}
+            ref={setRefs as React.Ref<HTMLInputElement>}
             disabled={disabled}
             value={value}
             defaultValue={defaultValue}

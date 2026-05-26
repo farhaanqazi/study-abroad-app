@@ -16,7 +16,9 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from app.utils.logger import app_logger
+from app.core.observability import get_logger
+
+logger = get_logger("app.exception")
 
 
 def build_exception_handler() -> Any:
@@ -32,7 +34,6 @@ def build_exception_handler() -> Any:
         request_id = getattr(request.state, "request_id", "unknown")
 
         error_context: dict[str, Any] = {
-            "event": "unhandled_exception",
             "request_id": request_id,
             "path": str(request.url.path),
             "method": request.method,
@@ -45,11 +46,9 @@ def build_exception_handler() -> Any:
         if request.client:
             error_context["client_host"] = request.client.host
 
-        app_logger.error(
-            f"Unhandled exception: {type(exc).__name__}: {exc}",
-            exc_info=True,
-            **error_context,
-        )
+        # exc_info=exc → the format_exc_info processor renders the full traceback
+        # (it lands in error.log, which captures ERROR+).
+        logger.error("unhandled_exception", exc_info=exc, **error_context)
 
         from app.core.config import get_settings
         settings = get_settings()

@@ -29,6 +29,21 @@ const TailwindSelect = forwardRef<HTMLSelectElement, TailwindSelectProps>(
     const [isFocused, setIsFocused] = React.useState(false);
     const [hasValue, setHasValue] = React.useState(!!value || !!defaultValue);
 
+    // Merge forwarded + internal ref so we can detect a value set by
+    // react-hook-form (via ref, not props) on mount and float the label.
+    const innerRef = React.useRef<HTMLSelectElement | null>(null);
+    const setRefs = React.useCallback(
+      (node: HTMLSelectElement | null) => {
+        innerRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) (ref as React.MutableRefObject<HTMLSelectElement | null>).current = node;
+      },
+      [ref],
+    );
+    React.useEffect(() => {
+      if (innerRef.current && innerRef.current.value) setHasValue(true);
+    }, []);
+
     const handleFocus = (e: React.FocusEvent<HTMLSelectElement>) => {
       setIsFocused(true);
       if (onFocus) onFocus(e);
@@ -54,7 +69,7 @@ const TailwindSelect = forwardRef<HTMLSelectElement, TailwindSelectProps>(
         <div className="relative">
           <select
             id={selectId}
-            ref={ref}
+            ref={setRefs}
             disabled={disabled}
             value={value}
             defaultValue={defaultValue}
