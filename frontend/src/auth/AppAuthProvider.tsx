@@ -26,7 +26,14 @@ function TokenBridge() {
 export default function AppAuthProvider({ children }: { children: ReactNode }) {
   if (!authConfigured) return <>{children}</>;
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey!} afterSignOutUrl="/console">
+    <ClerkProvider
+      publishableKey={clerkPublishableKey!}
+      afterSignOutUrl="/console"
+      // After any sign-in/sign-up (incl. the Google OAuth round-trip), land on
+      // the console instead of bouncing back to the bland home page at "/".
+      signInForceRedirectUrl="/console"
+      signUpForceRedirectUrl="/console"
+    >
       <TokenBridge />
       {children}
     </ClerkProvider>

@@ -24,6 +24,12 @@ export PYTHONPATH="$BACKEND"
 # Clerk apps. Derivable from the pk_ key — not a secret.
 export CLERK_ISSUER="${CLERK_ISSUER:-https://happy-lab-13.clerk.accounts.dev}"
 
+# Platform superadmin bootstrap. Matched against clerk_id OR email on login.
+# Using the clerk_id is reliable today because Clerk's default session token
+# omits email (so DB emails are @users.noreply.clerk placeholders). Once you add
+# an `email` claim to the Clerk session token, you can use farburgh@gmail.com here.
+export PLATFORM_SUPERADMINS="${PLATFORM_SUPERADMINS:-user_3EFf8eak57nqFohu6SDoJ2SGbV9,farburgh@gmail.com}"
+
 RUN_WORKER=1
 [[ "${1:-}" == "--no-worker" ]] && RUN_WORKER=0
 

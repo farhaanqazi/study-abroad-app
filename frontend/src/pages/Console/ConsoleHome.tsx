@@ -115,6 +115,27 @@ function RequestWorkspace({ email }: { email: string }) {
   );
 }
 
+function OperatorNoWorkspace() {
+  // A platform operator isn't a vendor member by default — they run the
+  // platform, not an agency. Point them at the back-office instead of the
+  // (nonsensical-for-them) "request a workspace" form.
+  return (
+    <div className="mt-4 rounded-xl border border-dashed border-neutral-300 p-6 text-center text-neutral-500">
+      <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-neutral-300" />
+      You're a platform operator and aren't a member of any vendor workspace —
+      that's normal. Manage and create workspaces from the back-office.
+      <div className="mt-4">
+        <Link
+          to="/admin"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+        >
+          <ShieldCheck size={16} /> Go to Platform Admin
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function ConsoleHome() {
   const { data: me, isLoading, isError } = useQuery({ queryKey: ['me'], queryFn: getMe, retry: false });
   const isOperator = me && me.platform_role !== 'none';
@@ -149,7 +170,8 @@ export default function ConsoleHome() {
           </p>
         )}
 
-        {me && me.memberships.length === 0 && <RequestWorkspace email={me.email} />}
+        {me && me.memberships.length === 0 &&
+          (isOperator ? <OperatorNoWorkspace /> : <RequestWorkspace email={me.email} />)}
 
         {me && me.memberships.length > 0 && (
           <ul className="mt-4 space-y-2">
