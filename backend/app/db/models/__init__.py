@@ -7,6 +7,7 @@ from app.db.models.leads import (
     QrLog,
 )
 from app.db.models.outbox import OutboxEvent, ProcessedEvent
+from app.db.models.platform import AuditLog, WorkspaceRequest
 from app.db.models.tenant import (
     User,
     Vendor,
@@ -22,6 +23,9 @@ __all__ = [
     "Vendor",
     "VendorMembership",
     "VendorSiteConfig",
+    # Platform back-office
+    "WorkspaceRequest",
+    "AuditLog",
     # Leads (study-abroad domain)
     "Inquiry",
     "Callback",

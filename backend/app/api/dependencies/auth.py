@@ -34,7 +34,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthClaims, AuthError, IdentityProvider
 from app.core.auth.clerk_provider import ClerkProvider
-from app.core.enums import UserRole
+from app.core.config import Settings, get_settings
+from app.core.enums import PlatformRole, UserRole
 from app.db.models.tenant import User, VendorMembership
 from app.db.session import get_session
 
@@ -51,6 +52,15 @@ _ROLE_RANK: dict[UserRole, int] = {
     UserRole.OWNER: 3,
     UserRole.AGENT: 2,
     UserRole.VIEWER: 1,
+}
+
+# Platform-operator hierarchy. NONE (rank 0) never satisfies a platform
+# requirement — it is the "no back-office access" floor.
+_PLATFORM_RANK: dict[PlatformRole, int] = {
+    PlatformRole.SUPERADMIN: 3,
+    PlatformRole.ADMIN: 2,
+    PlatformRole.SUPPORT: 1,
+    PlatformRole.NONE: 0,
 }
 
 
@@ -151,10 +161,29 @@ async def _provision_user(session: AsyncSession, claims: AuthClaims) -> User:
     return user
 
 
+async def _sync_bootstrap_superadmin(session: AsyncSession, user: User, settings: Settings) -> None:
+    """Promote a user to superadmin iff their clerk_id/email is in the env
+    allowlist. FAIL-CLOSED: empty allowlist promotes nobody. Promotion-only —
+    demotion is a deliberate in-console action, never an env side effect (so a
+    config slip can't silently strip the last admin mid-session).
+    """
+    allow = settings.platform_superadmin_set
+    if not allow:
+        return
+    if user.platform_role == PlatformRole.SUPERADMIN:
+        return
+    identity = {user.clerk_id.lower(), (user.email or "").lower()}
+    if identity & allow:
+        user.platform_role = PlatformRole.SUPERADMIN
+        await session.commit()
+        logger.info("platform_superadmin_bootstrapped", user_id=str(user.id))
+
+
 async def get_current_user(
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)],
     session: Annotated[AsyncSession, Depends(get_session)],
     provider: Annotated[IdentityProvider, Depends(get_identity_provider)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> User:
     """Verify the bearer token and return the (lazily provisioned) local user.
 
@@ -182,6 +211,7 @@ async def get_current_user(
         logger.info("auth_user_deleted", clerk_id=claims.clerk_id)
         raise _unauthorized()
 
+    await _sync_bootstrap_superadmin(session, user, settings)
     return user
 
 
@@ -266,9 +296,70 @@ class TenantRequire:
         return TenantContext(user=user, vendor_id=vendor_id, role=membership.role)
 
 
+@dataclass(frozen=True)
+class PlatformContext:
+    """Authenticated + authorized context for a platform back-office route.
+
+    Produced by :class:`PlatformRequire`. Independent of any tenant membership;
+    its existence proves the caller holds at least the required platform role.
+    """
+
+    user: User
+    role: PlatformRole
+
+
+def _platform_forbidden() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Platform administration access required",
+    )
+
+
+def _expand_allowed_platform_roles(required: tuple[PlatformRole, ...]) -> set[PlatformRole]:
+    """Expand required platform roles by hierarchy. Empty => any operator
+    (>= support). NONE is never included."""
+    effective = required or (PlatformRole.SUPPORT,)
+    threshold = min(_PLATFORM_RANK[r] for r in effective)
+    threshold = max(threshold, 1)  # never admit NONE (rank 0)
+    return {role for role, rank in _PLATFORM_RANK.items() if rank >= threshold}
+
+
+class PlatformRequire:
+    """Dependency factory enforcing platform-operator authorization.
+
+    Usage::
+
+        require_admin = PlatformRequire(PlatformRole.ADMIN)
+
+        @router.get("/admin/vendors")
+        async def list_vendors(ctx: PlatformContext = Depends(require_admin)):
+            ...
+
+    Checks ``user.platform_role`` only — never tenant membership. Insufficient
+    tier => 403. Gating every ``/api/v1/admin/**`` route with this is what keeps
+    the back-office unreachable by ordinary or tenant users.
+    """
+
+    def __init__(self, *roles: PlatformRole) -> None:
+        self._required = roles
+        self._allowed = _expand_allowed_platform_roles(roles)
+
+    async def __call__(self, user: User = Depends(get_current_user)) -> PlatformContext:
+        if user.platform_role not in self._allowed:
+            logger.info(
+                "platform_authz_denied",
+                user_id=str(user.id),
+                role=user.platform_role.value,
+            )
+            raise _platform_forbidden()
+        return PlatformContext(user=user, role=user.platform_role)
+
+
 __all__ = [
     "TenantContext",
     "TenantRequire",
+    "PlatformContext",
+    "PlatformRequire",
     "get_current_user",
     "get_identity_provider",
 ]

@@ -8,6 +8,7 @@ migration path stays decoupled from application runtime wiring.
 
 from app.db.models import (  # noqa: F401  (re-exported for metadata registration)
     Application,
+    AuditLog,
     Base,
     Callback,
     CostEstimate,
@@ -20,6 +21,7 @@ from app.db.models import (  # noqa: F401  (re-exported for metadata registratio
     VendorCostSetting,
     VendorMembership,
     VendorSiteConfig,
+    WorkspaceRequest,
 )
 
 __all__ = [
@@ -28,6 +30,8 @@ __all__ = [
     "Vendor",
     "VendorMembership",
     "VendorSiteConfig",
+    "WorkspaceRequest",
+    "AuditLog",
     "Inquiry",
     "Callback",
     "Application",

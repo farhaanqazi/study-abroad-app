@@ -26,6 +26,9 @@ class MembershipOut(BaseModel):
 class MeOut(BaseModel):
     id: str
     email: str
+    # Platform-operator tier ("none" for ordinary users). The frontend uses this
+    # to decide whether to expose the /admin back-office.
+    platform_role: str
     memberships: list[MembershipOut]
 
 
@@ -45,6 +48,7 @@ async def get_me(
     return MeOut(
         id=str(user.id),
         email=user.email,
+        platform_role=user.platform_role.value,
         memberships=[
             MembershipOut(
                 vendor_id=str(vendor.id),

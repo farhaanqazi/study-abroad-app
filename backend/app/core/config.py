@@ -45,6 +45,21 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("CLERK_JWKS_CACHE_TTL_SECONDS"),
     )
 
+    # Platform back-office bootstrap. Comma-separated Clerk user ids and/or
+    # emails that are auto-granted the `superadmin` platform role on login.
+    # This is the ONLY out-of-UI grant path (solves the first-admin chicken-egg);
+    # everyone else is promoted in-console by a superadmin. FAIL-CLOSED: empty
+    # (the default) means zero auto-admins, never all.
+    platform_superadmins: str = Field(
+        default="",
+        validation_alias=AliasChoices("PLATFORM_SUPERADMINS", "PLATFORM_SUPERADMIN_CLERK_IDS"),
+    )
+
+    @property
+    def platform_superadmin_set(self) -> set[str]:
+        """Normalized allowlist (lowercased) of clerk ids / emails."""
+        return {item.strip().lower() for item in self.platform_superadmins.split(",") if item.strip()}
+
     @property
     def effective_clerk_jwks_url(self) -> Optional[str]:
         if self.clerk_jwks_url:

@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.enums import UserRole
+from app.core.enums import PlatformRole, UserRole, VendorStatus
 from app.db.models.common import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 # DB-native role enum. The type is owned by Alembic (created in the baseline
@@ -25,6 +25,20 @@ from app.db.models.common import Base, TimestampMixin, UUIDPrimaryKeyMixin
 user_role_enum = SAEnum(
     UserRole,
     name="user_role",
+    values_callable=lambda enum: [member.value for member in enum],
+)
+
+# Platform-operator tier (back-office). Independent of tenant membership.
+platform_role_enum = SAEnum(
+    PlatformRole,
+    name="platform_role",
+    values_callable=lambda enum: [member.value for member in enum],
+)
+
+# Workspace lifecycle, admin-controlled.
+vendor_status_enum = SAEnum(
+    VendorStatus,
+    name="vendor_status",
     values_callable=lambda enum: [member.value for member in enum],
 )
 
@@ -41,6 +55,16 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     clerk_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
+    # Platform-operator tier. Default NONE: ordinary users have zero back-office
+    # access. Promoted via the env bootstrap allowlist (first superadmin) or by
+    # an existing superadmin in the admin console.
+    platform_role: Mapped[PlatformRole] = mapped_column(
+        platform_role_enum,
+        nullable=False,
+        default=PlatformRole.NONE,
+        server_default=PlatformRole.NONE.value,
+        index=True,
+    )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     memberships: Mapped[list["VendorMembership"]] = relationship(
@@ -60,6 +84,15 @@ class Vendor(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
     business_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Admin-controlled lifecycle. `is_active` stays as the public-site visibility
+    # flag; `status` is the operator-facing state machine (active/suspended/deleted).
+    status: Mapped[VendorStatus] = mapped_column(
+        vendor_status_enum,
+        nullable=False,
+        default=VendorStatus.ACTIVE,
+        server_default=VendorStatus.ACTIVE.value,
+        index=True,
+    )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     memberships: Mapped[list["VendorMembership"]] = relationship(
