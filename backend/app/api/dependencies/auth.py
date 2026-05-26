@@ -212,6 +212,18 @@ async def get_current_user(
         raise _unauthorized()
 
     await _sync_bootstrap_superadmin(session, user, settings)
+
+    # Claim any pending invitations addressed to this user's email (created by an
+    # admin/owner before the invitee first logged in). Idempotent + cheap.
+    try:
+        from app.services.members import claim_invitations_for_user
+
+        if await claim_invitations_for_user(session, user):
+            await session.commit()
+    except Exception:  # pragma: no cover - never block auth on invite claiming
+        await session.rollback()
+        logger.warning("invitation_claim_failed", user_id=str(user.id))
+
     return user
 
 

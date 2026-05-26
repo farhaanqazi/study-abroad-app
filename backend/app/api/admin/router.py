@@ -10,8 +10,24 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.admin import workspace_requests
+from app.api.admin import (
+    audit,
+    impersonation,
+    members,
+    ops,
+    support,
+    users,
+    vendors,
+    workspace_requests,
+)
 
 admin_router = APIRouter(prefix="/admin")
 
 admin_router.include_router(workspace_requests.router)
+admin_router.include_router(vendors.router)
+admin_router.include_router(members.router)
+admin_router.include_router(users.router)
+admin_router.include_router(ops.router)
+admin_router.include_router(audit.router)
+admin_router.include_router(impersonation.router)
+admin_router.include_router(support.router)
