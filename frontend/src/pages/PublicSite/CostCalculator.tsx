@@ -141,7 +141,7 @@ export default function CostCalculator({ vendorSlug }: { vendorSlug: string }) {
 
       <div className="flex items-center">
         {result ? (
-          <div className="w-full rounded-2xl border border-neutral-200 bg-[var(--color-surface-overlay,#fafafa)] p-6">
+          <div className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 p-6">
             <p className="text-sm text-neutral-500">Estimated annual study budget</p>
             <p className="mt-1 text-4xl font-bold tracking-tight text-neutral-900">
               {money(result.currency, result.total)}
