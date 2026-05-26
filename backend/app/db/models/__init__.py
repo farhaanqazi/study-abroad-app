@@ -6,8 +6,10 @@ from app.db.models.leads import (
     Inquiry,
     QrLog,
 )
+from app.db.models.invitation import Invitation
 from app.db.models.outbox import OutboxEvent, ProcessedEvent
 from app.db.models.platform import AuditLog, WorkspaceRequest
+from app.db.models.support import SupportTicket, SupportTicketMessage
 from app.db.models.tenant import (
     User,
     Vendor,
@@ -26,6 +28,9 @@ __all__ = [
     # Platform back-office
     "WorkspaceRequest",
     "AuditLog",
+    "Invitation",
+    "SupportTicket",
+    "SupportTicketMessage",
     # Leads (study-abroad domain)
     "Inquiry",
     "Callback",

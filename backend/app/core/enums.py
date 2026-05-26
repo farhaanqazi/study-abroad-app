@@ -53,6 +53,25 @@ class WorkspaceRequestStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class InvitationStatus(str, Enum):
+    """Lifecycle of a tenant member invitation (claimed when the invited email
+    next authenticates)."""
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REVOKED = "revoked"
+    EXPIRED = "expired"
+
+
+class SupportTicketStatus(str, Enum):
+    """Back-office support ticket lifecycle."""
+
+    OPEN = "open"
+    PENDING = "pending"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+
 class VendorStatus(str, Enum):
     """Admin-controlled lifecycle of a workspace (vendor).
 
